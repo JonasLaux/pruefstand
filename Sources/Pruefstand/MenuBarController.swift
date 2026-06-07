@@ -16,9 +16,11 @@ final class MenuBarController: NSObject, NSWindowDelegate {
     private let panel: PRPanel
     private let store: PRStore
     private let settings: Settings
+    private let actionMode: PRActionMode
 
     var onRefresh: () -> Void = {}
     var onPopoverState: (Bool) -> Void = { _ in }
+    var onPRAction: (PRAction, PullRequest) -> Void = { _, _ in }
 
     private let panelWidth: CGFloat = 400
     private let panelHeight: CGFloat
@@ -26,9 +28,10 @@ final class MenuBarController: NSObject, NSWindowDelegate {
     private var clickMonitor: Any?
     private var cancellables = Set<AnyCancellable>()
 
-    init(store: PRStore, settings: Settings) {
+    init(store: PRStore, settings: Settings, actionMode: PRActionMode) {
         self.store = store
         self.settings = settings
+        self.actionMode = actionMode
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         let available = (NSScreen.main?.visibleFrame.height ?? 600) - 24
@@ -77,7 +80,9 @@ final class MenuBarController: NSObject, NSWindowDelegate {
             store: store,
             settings: settings,
             height: panelHeight,
+            actionMode: actionMode,
             onRefresh: { [weak self] in self?.onRefresh() },
+            onPRAction: { [weak self] action, pr in self?.onPRAction(action, pr) },
             onOpenSettings: { [weak self] in self?.openSettings() },
             onQuit: { NSApp.terminate(nil) }
         )

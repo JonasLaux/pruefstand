@@ -4,6 +4,47 @@ A small macOS menu bar app for tracking GitHub pull requests that need your revi
 
 It uses the locally authenticated `gh` CLI, polls for open review requests, shows them in a popover, and can send native notifications for newly surfaced PRs.
 
+## Getting started
+
+1. Make sure the GitHub CLI is installed and authenticated:
+
+```sh
+gh auth status
+```
+
+If that fails, run:
+
+```sh
+gh auth login
+```
+
+2. Build and launch the app:
+
+```sh
+swift build
+swift run Pruefstand
+```
+
+For safe UI testing with mock data, use preview mode:
+
+```sh
+swift run Pruefstand --preview
+```
+
+3. Open Settings from the menu bar popover and choose which PRs to watch.
+
+4. Optional: configure [Nudge commands](#nudge-commands) so each PR row can run
+your own local reminder workflow. For example, this asks Codex to draft a review
+nudge and copies it to the clipboard:
+
+```sh
+codex "Draft a concise, friendly PR review reminder. PR: $PR_TITLE. Repo: $PR_REPO. Open for $PR_AGE_DAYS days. Link: $PR_URL." | pbcopy
+```
+
+Pruefstand only runs the command with PR context. The command decides whether to
+copy text, open another app, call a local agent, or hand off to one of your own
+scripts.
+
 ## Build
 
 ```sh
@@ -14,4 +55,124 @@ To assemble a local `.app` bundle:
 
 ```sh
 ./scripts/bundle.sh
+```
+
+For UI iteration, launch the app in preview-window mode with mock PR data:
+
+```sh
+swift run Pruefstand --preview
+```
+
+To test action UI against real PR data without approving or closing anything:
+
+```sh
+swift run Pruefstand --debug-actions
+```
+
+Or, after bundling:
+
+```sh
+open Pruefstand.app --args --preview
+```
+
+```sh
+open Pruefstand.app --args --debug-actions
+```
+
+## Nudge commands
+
+Pruefstand can run local commands for a PR from the row actions:
+
+- **Nudge** runs the configured default reminder command.
+- **Urgent nudge** runs the configured escalation command.
+
+Configure them in Settings -> Commands. Empty commands hide their buttons. Commands
+run through `/bin/zsh -lc` with a GUI-safe PATH prefix:
+
+```text
+/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
+```
+
+Pruefstand does not authenticate Slack, email, or any other delivery channel. The
+command decides what happens. For example:
+
+```sh
+codex "Draft a concise, friendly PR review reminder. PR: $PR_TITLE. Repo: $PR_REPO. Open for $PR_AGE_DAYS days. Link: $PR_URL." | pbcopy
+```
+
+or:
+
+```sh
+~/bin/pr-nudge {url}
+```
+
+### Environment variables
+
+Every nudge command receives these variables:
+
+| Variable | Description |
+| --- | --- |
+| `PR_TITLE` | Pull request title |
+| `PR_URL` | Browser URL for the pull request |
+| `PR_REPO` | Repository name with owner |
+| `PR_NUMBER` | Pull request number without `#` |
+| `PR_AUTHOR` | GitHub login of the PR author |
+| `PR_CREATED_AT` | ISO-8601 creation timestamp |
+| `PR_UPDATED_AT` | ISO-8601 update timestamp |
+| `PR_AGE_DAYS` | Whole days since creation, minimum `0` |
+| `PR_REVIEW_DECISION` | GitHub review decision when available |
+| `PR_COMMENT_COUNT` | Total PR issue comment count |
+| `PR_CI_STATE` | `success`, `failure`, `pending`, or `none` |
+| `PR_ADDITIONS` | Added line count |
+| `PR_DELETIONS` | Deleted line count |
+| `PR_CHANGED_FILES` | Changed file count |
+| `PR_LABELS` | Comma-separated label names |
+
+### Placeholders
+
+Placeholders are replaced before the command is passed to the shell. They are
+POSIX shell-quoted, so use them as standalone shell words:
+
+```sh
+~/bin/pr-nudge {url}
+```
+
+For natural-language prompts, prefer environment variables inside a quoted string:
+
+```sh
+codex "Write a review nudge for $PR_TITLE: $PR_URL" | pbcopy
+```
+
+| Placeholder | Environment variable |
+| --- | --- |
+| `{title}` | `PR_TITLE` |
+| `{url}` | `PR_URL` |
+| `{repo}` | `PR_REPO` |
+| `{number}` | `PR_NUMBER` |
+| `{author}` | `PR_AUTHOR` |
+| `{created_at}` | `PR_CREATED_AT` |
+| `{updated_at}` | `PR_UPDATED_AT` |
+| `{age_days}` | `PR_AGE_DAYS` |
+| `{review_decision}` | `PR_REVIEW_DECISION` |
+| `{comment_count}` | `PR_COMMENT_COUNT` |
+| `{ci_state}` | `PR_CI_STATE` |
+| `{additions}` | `PR_ADDITIONS` |
+| `{deletions}` | `PR_DELETIONS` |
+| `{changed_files}` | `PR_CHANGED_FILES` |
+| `{labels}` | `PR_LABELS` |
+
+Unknown placeholders are left unchanged.
+
+### Prompt an agent
+
+You can ask a local agent to write a command:
+
+```text
+Write me a Pruefstand Nudge command.
+
+It can use these variables:
+PR_TITLE, PR_URL, PR_REPO, PR_AUTHOR, PR_AGE_DAYS, PR_CHANGED_FILES, PR_LABELS.
+
+I want it to ask Codex to draft a short friendly PR review reminder and copy the
+result to my clipboard. Do not hardcode PR-specific values.
 ```

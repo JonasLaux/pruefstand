@@ -19,9 +19,15 @@ actor GHClient {
             createdAt
             updatedAt
             reviewDecision
+            additions
+            deletions
+            changedFiles
             repository { nameWithOwner }
             author { login avatarUrl }
             comments { totalCount }
+            labels(first: 50) {
+              nodes { name color }
+            }
             commits(last: 1) {
               nodes { commit { statusCheckRollup { state } } }
             }
@@ -58,6 +64,15 @@ actor GHClient {
             }
         }
         return Array(byId.values)
+    }
+
+    func perform(action: PRAction, onURL url: String) async throws {
+        let ghPath = try resolveGH()
+        let (out, err, status) = try run(ghPath: ghPath, args: action.ghArguments(for: url))
+        guard status == 0 else {
+            let detail = err.isEmpty ? out : err
+            throw GHError(message: "gh failed (exit \(status)): \(detail.trimmingCharacters(in: .whitespacesAndNewlines))")
+        }
     }
 
     // MARK: - gh process

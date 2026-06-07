@@ -37,6 +37,12 @@ enum CIState: String {
 }
 
 /// A pull request that needs review. `id` is the PR url (globally unique).
+struct PRDiffStats: Equatable {
+    let additions: Int
+    let deletions: Int
+    let changedFiles: Int
+}
+
 struct PullRequest: Identifiable, Equatable {
     let id: String
     let number: Int
@@ -50,6 +56,8 @@ struct PullRequest: Identifiable, Equatable {
     let reviewDecision: String?
     let commentCount: Int
     let ci: CIState
+    let labels: [PRLabel]
+    let diffStats: PRDiffStats
 }
 
 // MARK: - GraphQL response decoding
@@ -79,14 +87,25 @@ struct Node: Decodable {
     let createdAt: Date?
     let updatedAt: Date?
     let reviewDecision: String?
+    let additions: Int?
+    let deletions: Int?
+    let changedFiles: Int?
     let repository: Repo?
     let author: Author?
     let comments: Comments?
     let commits: Commits?
+    let labels: Labels?
 
     struct Repo: Decodable { let nameWithOwner: String }
     struct Author: Decodable { let login: String; let avatarUrl: String? }
     struct Comments: Decodable { let totalCount: Int }
+    struct Labels: Decodable {
+        let nodes: [LabelNode]
+        struct LabelNode: Decodable {
+            let name: String
+            let color: String
+        }
+    }
     struct Commits: Decodable {
         let nodes: [CommitNode]
         struct CommitNode: Decodable {
@@ -115,7 +134,13 @@ struct Node: Decodable {
             updatedAt: updatedAt,
             reviewDecision: reviewDecision,
             commentCount: comments?.totalCount ?? 0,
-            ci: CIState(rawRollup: rollup)
+            ci: CIState(rawRollup: rollup),
+            labels: labels?.nodes.map { PRLabel(name: $0.name, colorHex: $0.color) } ?? [],
+            diffStats: PRDiffStats(
+                additions: additions ?? 0,
+                deletions: deletions ?? 0,
+                changedFiles: changedFiles ?? 0
+            )
         )
     }
 }
