@@ -2,6 +2,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+mkdir -p .build
 
 swiftc \
     Sources/Pruefstand/LaunchMode.swift \
@@ -17,6 +18,26 @@ swiftc \
     -o .build/tag-filter-check
 
 .build/tag-filter-check
+
+swiftc \
+    Sources/Pruefstand/Models.swift \
+    Sources/Pruefstand/Labels.swift \
+    Tests/PRStatusMetadataChecks/main.swift \
+    -o .build/pr-status-metadata-check
+
+.build/pr-status-metadata-check
+
+swiftc \
+    Tests/GraphQLBudgetChecks/main.swift \
+    -o .build/graphql-budget-check
+
+.build/graphql-budget-check
+
+swiftc \
+    Tests/PopoverLayoutChecks/main.swift \
+    -o .build/popover-layout-check
+
+.build/popover-layout-check
 
 swiftc \
     Sources/Pruefstand/LaunchMode.swift \

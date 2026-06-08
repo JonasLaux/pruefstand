@@ -18,7 +18,7 @@ struct PopoverView: View {
             Divider()
             footer
         }
-        .frame(width: 400, height: height)
+        .frame(width: PopoverLayout.width, height: height)
     }
 
     private var topBar: some View {

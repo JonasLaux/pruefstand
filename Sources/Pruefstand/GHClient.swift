@@ -25,11 +25,40 @@ actor GHClient {
             repository { nameWithOwner }
             author { login avatarUrl }
             comments { totalCount }
+            reviewThreads(first: 100) {
+              nodes {
+                isResolved
+                comments(first: 1) {
+                  totalCount
+                  nodes { author { login } }
+                }
+              }
+            }
             labels(first: 50) {
               nodes { name color }
             }
             commits(last: 1) {
-              nodes { commit { statusCheckRollup { state } } }
+              nodes {
+                commit {
+                  statusCheckRollup {
+                    state
+                    contexts(first: 100) {
+                      nodes {
+                        __typename
+                        ... on CheckRun {
+                          name
+                          status
+                          conclusion
+                        }
+                        ... on StatusContext {
+                          context
+                          state
+                        }
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         }

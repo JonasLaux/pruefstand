@@ -43,37 +43,45 @@ struct PRRowView: View {
         }
         .padding(.vertical, 6)
         .padding(.leading, 10)
-        .padding(.trailing, 30)
+        .padding(.trailing, 14)
     }
 
     private var textStack: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(pr.title)
                 .font(.system(size: 13, weight: .medium))
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
+                .lineLimit(1)
+                .truncationMode(.tail)
             HStack(spacing: 6) {
                 Text(pr.repo)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
                 Text("#\(pr.number)")
                     .foregroundStyle(.tertiary)
+                    .fixedSize()
             }
             .font(.system(size: 11))
+            .lineLimit(1)
             if !pr.labels.isEmpty {
                 tagRow
             }
-            HStack(alignment: .top, spacing: 10) {
-                Label(pr.authorLogin, systemImage: "person")
-                Label(relativeAge, systemImage: "clock")
-                DiffStatsView(stats: pr.diffStats)
-                Label("\(pr.commentCount)", systemImage: "bubble.left")
-                ciBadge
-            }
-            .font(.system(size: 10))
-            .foregroundStyle(.secondary)
-            .labelStyle(.titleAndIcon)
+            metadataRow
             statusLine
         }
+    }
+
+    private var metadataRow: some View {
+        HStack(alignment: .center, spacing: 8) {
+            MetaItem(systemImage: "person", text: pr.authorLogin, maxWidth: 76)
+            MetaItem(systemImage: "clock", text: relativeAge, maxWidth: 48)
+            DiffStatsView(stats: pr.diffStats)
+            commentBadges
+            ciBadge
+        }
+        .font(.system(size: 10))
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
     }
 
     private var actionButtons: some View {
@@ -239,7 +247,27 @@ struct PRRowView: View {
 
     private var ciBadge: some View {
         Image(systemName: pr.ci.symbolName)
+            .frame(width: 12, height: 12)
             .foregroundStyle(Color(pr.ci.color))
+            .help(pr.ciTooltip)
+    }
+
+    private var commentBadges: some View {
+        HStack(spacing: 7) {
+            IconNumberBadge(
+                systemImage: "bubble.left",
+                value: pr.totalCommentCount,
+                color: .secondary,
+                help: "Comments: \(pr.totalCommentCount)"
+            )
+            IconNumberBadge(
+                systemImage: "exclamationmark.bubble",
+                value: pr.unresolvedReviewThreadCount,
+                color: pr.unresolvedReviewThreadCount > 0 ? .orange : .secondary,
+                help: pr.unresolvedReviewThreadsTooltip
+            )
+        }
+        .fixedSize(horizontal: true, vertical: false)
     }
 
     private var relativeAge: String {
@@ -267,6 +295,46 @@ private struct DiffStatsView: View {
             Label("\(stats.changedFiles)", systemImage: "doc.text")
                 .labelStyle(.titleAndIcon)
         }
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
+    }
+}
+
+private struct MetaItem: View {
+    let systemImage: String
+    let text: String
+    let maxWidth: CGFloat
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: systemImage)
+                .frame(width: 11)
+            Text(text)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: maxWidth, alignment: .leading)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+private struct IconNumberBadge: View {
+    let systemImage: String
+    let value: Int
+    let color: Color
+    let help: String
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: systemImage)
+                .frame(width: 12)
+            Text("\(value)")
+                .monospacedDigit()
+        }
+        .foregroundStyle(color)
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
+        .help(help)
     }
 }
 

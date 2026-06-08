@@ -42,8 +42,15 @@ gh api graphql -f query='<query>'
   - `author { login, avatarUrl }`
   - `createdAt`, `updatedAt`
   - `reviewDecision`
-  - `comments { totalCount }` and review-thread count
-  - `commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }` for CI
+  - `comments { totalCount }`
+  - `reviewThreads(first: 100)` with `isResolved`, `comments { totalCount }`,
+    and one comment author node for unresolved-thread attribution
+  - `commits(last: 1)` with `statusCheckRollup { state }` plus bounded check
+    contexts for failed-CI tooltips
+- **GraphQL budget:** nested review-thread comments intentionally fetch
+  `comments(first: 1)` rather than every comment node. The row needs total review
+  comment counts and one author per unresolved thread, not all review comment
+  bodies. This keeps the GitHub query under the possible-node limit.
 - **Decoding:** `Codable` models (`PullRequest`, `Repository`, `Author`, `CIState`).
 
 ### Search query construction (from Settings toggles)
@@ -100,16 +107,27 @@ Each unit has one purpose, a defined interface, and is independently testable.
 
 Rich scrollable list. **Each row:**
 
-- PR title (truncating)
-- repo `nameWithOwner` (secondary text)
+- PR title (single line, truncating)
+- repo `nameWithOwner` and PR number (single line, secondary text)
+- labels (up to three chips)
 - author avatar + login
 - relative age ("opened 3d ago", from `createdAt`)
-- comment count with icon
+- diff stats
+- total comment count with icon (`comments.totalCount` + review-thread comment totals)
+- unresolved review-thread count with icon; hover shows a grouped author list, for
+  example `2 coderabbitai`, `1 codex`
 - CI rollup badge: green (success) / red (failure) / yellow (pending) / gray (none) /
-  spinner while a live refresh is in flight
+  spinner while a live refresh is in flight; hover on failure lists the failed
+  check runs/status contexts
 - whole row clickable → opens `url` in default browser
 
-**Top bar:** repo filter (multi-select menu), sort dropdown, manual refresh button.
+The menu-bar popover uses a fixed shared width (`PopoverLayout.width`) so the
+SwiftUI view and AppKit panel stay in sync. Row metadata is constrained to
+single-line compact groups to avoid overlap or wrapping when comments, unresolved
+threads, diff stats, and CI status are all present.
+
+**Top bar:** repo filter (multi-select menu), tag filter, sort dropdown, manual
+refresh button.
 
 **States:** loading (first fetch), empty ("Nothing to review 🎉"), error (gh missing /
 not authed, with the resolved cause).
@@ -152,6 +170,12 @@ Applied client-side in `PRStore` over the fetched list:
   strings and number of search calls.
 - JSON decoding: fixture GraphQL responses → `PullRequest` models, incl. missing CI,
   missing author, multiple repos.
+- PR status metadata decoding: fixture GraphQL response → failed check names,
+  total comments, unresolved thread author grouping, and tooltip text.
+- GraphQL budget guardrail: source check that nested review-thread comments stay at
+  `first: 1` so the query does not exceed GitHub's possible-node limit.
+- Popover layout guardrail: source check that the panel/view share width constants
+  and row metadata uses compact single-line items.
 - `PRStore` filter/sort: given a fixed list, assert repo filter, blocklist (incl.
   `[bot]` suffix), and each sort order.
 - `NotificationManager` diff logic: seen-set transitions, paused gating, no-flood on

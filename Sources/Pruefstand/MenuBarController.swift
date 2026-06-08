@@ -22,7 +22,7 @@ final class MenuBarController: NSObject, NSWindowDelegate {
     var onPopoverState: (Bool) -> Void = { _ in }
     var onPRAction: (PRAction, PullRequest) -> Void = { _, _ in }
 
-    private let panelWidth: CGFloat = 400
+    private let panelWidth: CGFloat = PopoverLayout.width
     private let panelHeight: CGFloat
     private var settingsWindow: NSWindow?
     private var clickMonitor: Any?

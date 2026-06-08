@@ -24,7 +24,7 @@ final class PreviewAppDelegate: NSObject, NSApplicationDelegate {
         let content = PreviewWindowContent(store: store, settings: settings, actionMode: actionMode)
         let hosting = NSHostingView(rootView: content)
         let win = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 600),
+            contentRect: NSRect(x: 0, y: 0, width: PopoverLayout.previewWindowWidth, height: 600),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
@@ -131,10 +131,19 @@ private enum PreviewPullRequests {
                 author: "mira",
                 createdAt: now.addingTimeInterval(-38 * 60),
                 updatedAt: now.addingTimeInterval(-8 * 60),
-            comments: 4,
-            ci: .failure,
-            diffStats: PRDiffStats(additions: 428, deletions: 91, changedFiles: 12),
-            labels: [
+                comments: 4,
+                reviewComments: 7,
+                unresolvedReviewThreadsByAuthor: [
+                    ReviewThreadAuthorCount(author: "coderabbitai", count: 2),
+                    ReviewThreadAuthorCount(author: "codex", count: 1)
+                ],
+                ci: .failure,
+                failedCIChecks: [
+                    FailedCICheck(name: "Unit tests"),
+                    FailedCICheck(name: "deploy preview")
+                ],
+                diffStats: PRDiffStats(additions: 428, deletions: 91, changedFiles: 12),
+                labels: [
                     PRLabel(name: "complexity:high", colorHex: "d73a4a"),
                     PRLabel(name: "area:app", colorHex: "1d76db"),
                     PRLabel(name: "needs-review", colorHex: "fbca04")
@@ -196,7 +205,10 @@ private enum PreviewPullRequests {
         createdAt: Date,
         updatedAt: Date,
         comments: Int,
+        reviewComments: Int = 0,
+        unresolvedReviewThreadsByAuthor: [ReviewThreadAuthorCount] = [],
         ci: CIState,
+        failedCIChecks: [FailedCICheck] = [],
         diffStats: PRDiffStats,
         labels: [PRLabel]
     ) -> PullRequest {
@@ -212,7 +224,10 @@ private enum PreviewPullRequests {
             updatedAt: updatedAt,
             reviewDecision: "REVIEW_REQUIRED",
             commentCount: comments,
+            reviewCommentCount: reviewComments,
+            unresolvedReviewThreadsByAuthor: unresolvedReviewThreadsByAuthor,
             ci: ci,
+            failedCIChecks: failedCIChecks,
             labels: labels,
             diffStats: diffStats
         )

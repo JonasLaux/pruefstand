@@ -4,6 +4,13 @@ A small macOS menu bar app for tracking GitHub pull requests that need your revi
 
 It uses the locally authenticated `gh` CLI, polls for open review requests, shows them in a popover, and can send native notifications for newly surfaced PRs.
 
+Each PR row shows compact review status metadata:
+
+- total comment count, combining issue comments and review-thread comments
+- unresolved review-thread count, with a hover tooltip grouped by author
+- CI rollup state, with a hover tooltip listing failed check runs/status contexts when CI fails
+- labels, diff stats, author, age, repo, and PR number in a single-line row layout
+
 ## Getting started
 
 1. Make sure the GitHub CLI is installed and authenticated:
@@ -57,6 +64,10 @@ To assemble a local `.app` bundle:
 ./scripts/bundle.sh
 ```
 
+Rebuild the bundle after code changes before reopening `Pruefstand.app`; `swift
+build` updates the SwiftPM binary, while the bundle script copies the release
+binary into the app bundle.
+
 For UI iteration, launch the app in preview-window mode with mock PR data:
 
 ```sh
@@ -78,6 +89,18 @@ open Pruefstand.app --args --preview
 ```sh
 open Pruefstand.app --args --debug-actions
 ```
+
+## Checks
+
+Run the lightweight repository checks before committing:
+
+```sh
+./scripts/check-launch-mode.sh
+```
+
+The script compiles focused Swift checks for launch/action behavior, settings,
+filters, nudge command interpolation, PR status metadata decoding, GraphQL query
+budget guardrails, and popover layout invariants.
 
 ## Nudge commands
 
