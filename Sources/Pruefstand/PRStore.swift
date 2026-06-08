@@ -60,7 +60,7 @@ final class PRStore: ObservableObject {
 
     /// Filtered + sorted list shown in the UI.
     var displayed: [PullRequest] {
-        var list = raw.filter { !settings.isBlocked(author: $0.authorLogin) }
+        var list = raw.filter { !settings.isBlocked(author: $0.authorLogin) && !settings.isIgnored($0) }
         if !settings.repoFilter.isEmpty {
             list = list.filter { settings.repoFilter.contains($0.repo) }
         }

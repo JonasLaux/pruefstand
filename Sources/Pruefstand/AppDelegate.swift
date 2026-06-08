@@ -40,6 +40,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     try await Task.sleep(for: .milliseconds(500))
                 } else if action.isGitHubMutation {
                     try await client.perform(action: action, onURL: pr.url)
+                } else if action == .ignore {
+                    settings.ignore(pr: pr)
                 } else if let command {
                     try await commandRunner.run(command: command, for: pr)
                 } else {

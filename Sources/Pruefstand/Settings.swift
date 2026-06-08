@@ -13,6 +13,12 @@ enum SortKey: String, CaseIterable {
     }
 }
 
+enum PRIgnoreKey {
+    static func make(repo: String, number: Int) -> String {
+        "\(repo)#\(number)"
+    }
+}
+
 /// User-configurable settings, persisted to `UserDefaults`.
 @MainActor
 final class Settings: ObservableObject {
@@ -29,41 +35,26 @@ final class Settings: ObservableObject {
     @Published var notificationsEnabled: Bool { didSet { d.set(notificationsEnabled, forKey: "notificationsEnabled") } }
     @Published var notificationsPaused: Bool { didSet { d.set(notificationsPaused, forKey: "notificationsPaused") } }
     @Published var seenPRIds: Set<String> { didSet { d.set(Array(seenPRIds), forKey: "seenPRIds") } }
+    @Published var ignoredPRKeys: Set<String> { didSet { d.set(Array(ignoredPRKeys), forKey: "ignoredPRKeys") } }
     @Published var nudgeCommand: String { didSet { d.set(nudgeCommand, forKey: "nudgeCommand") } }
     @Published var urgentNudgeCommand: String { didSet { d.set(urgentNudgeCommand, forKey: "urgentNudgeCommand") } }
 
     init(userDefaults: UserDefaults = .standard) {
         d = userDefaults
-        if d.object(forKey: "pollIntervalMinutes") == nil {
-            // First launch defaults.
-            pollIntervalMinutes = 5
-            toggleDirect = false
-            toggleTeams = true            // superset: covers direct + team requests
-            toggleMentioned = false
-            repoFilter = []
-            tagFilters = []
-            authorBlocklist = ["renovate", "dependabot", "github-actions"]
-            sortKey = .created
-            notificationsEnabled = true
-            notificationsPaused = false
-            seenPRIds = []
-            nudgeCommand = ""
-            urgentNudgeCommand = ""
-        } else {
-            pollIntervalMinutes = max(1, d.integer(forKey: "pollIntervalMinutes"))
-            toggleDirect = d.bool(forKey: "toggleDirect")
-            toggleTeams = d.bool(forKey: "toggleTeams")
-            toggleMentioned = d.bool(forKey: "toggleMentioned")
-            repoFilter = Set(d.stringArray(forKey: "repoFilter") ?? [])
-            tagFilters = Set((d.stringArray(forKey: "tagFilters") ?? []).compactMap(TagFilter.init(rawValue:)))
-            authorBlocklist = d.stringArray(forKey: "authorBlocklist") ?? []
-            sortKey = SortKey(rawValue: d.string(forKey: "sortKey") ?? "created") ?? .created
-            notificationsEnabled = d.object(forKey: "notificationsEnabled") as? Bool ?? true
-            notificationsPaused = d.bool(forKey: "notificationsPaused")
-            seenPRIds = Set(d.stringArray(forKey: "seenPRIds") ?? [])
-            nudgeCommand = d.string(forKey: "nudgeCommand") ?? ""
-            urgentNudgeCommand = d.string(forKey: "urgentNudgeCommand") ?? ""
-        }
+        pollIntervalMinutes = max(1, d.object(forKey: "pollIntervalMinutes") as? Int ?? 5)
+        toggleDirect = d.object(forKey: "toggleDirect") as? Bool ?? false
+        toggleTeams = d.object(forKey: "toggleTeams") as? Bool ?? true
+        toggleMentioned = d.object(forKey: "toggleMentioned") as? Bool ?? false
+        repoFilter = Set(d.stringArray(forKey: "repoFilter") ?? [])
+        tagFilters = Set((d.stringArray(forKey: "tagFilters") ?? []).compactMap(TagFilter.init(rawValue:)))
+        authorBlocklist = d.stringArray(forKey: "authorBlocklist") ?? ["renovate", "dependabot", "github-actions"]
+        sortKey = SortKey(rawValue: d.string(forKey: "sortKey") ?? "created") ?? .created
+        notificationsEnabled = d.object(forKey: "notificationsEnabled") as? Bool ?? true
+        notificationsPaused = d.object(forKey: "notificationsPaused") as? Bool ?? false
+        seenPRIds = Set(d.stringArray(forKey: "seenPRIds") ?? [])
+        ignoredPRKeys = Set(d.stringArray(forKey: "ignoredPRKeys") ?? [])
+        nudgeCommand = d.string(forKey: "nudgeCommand") ?? ""
+        urgentNudgeCommand = d.string(forKey: "urgentNudgeCommand") ?? ""
     }
 
     var availableCommandActions: [PRAction] {
@@ -76,7 +67,7 @@ final class Settings: ObservableObject {
             return nonEmptyCommand(nudgeCommand)
         case .urgentNudge:
             return nonEmptyCommand(urgentNudgeCommand)
-        case .approve, .close:
+        case .ignore, .approve, .close:
             return nil
         }
     }
@@ -86,6 +77,18 @@ final class Settings: ObservableObject {
         let lower = login.lowercased()
         if lower.hasSuffix("[bot]") { return true }
         return authorBlocklist.contains { lower == $0.lowercased() }
+    }
+
+    func isIgnored(repo: String, number: Int) -> Bool {
+        ignoredPRKeys.contains(PRIgnoreKey.make(repo: repo, number: number))
+    }
+
+    func ignore(repo: String, number: Int) {
+        ignoredPRKeys.insert(PRIgnoreKey.make(repo: repo, number: number))
+    }
+
+    func clearIgnoredPRs() {
+        ignoredPRKeys = []
     }
 
     private func nonEmptyCommand(_ command: String) -> String? {

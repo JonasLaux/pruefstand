@@ -38,6 +38,18 @@ swiftc \
 swiftc \
     Sources/Pruefstand/Models.swift \
     Sources/Pruefstand/Labels.swift \
+    Sources/Pruefstand/PRActions.swift \
+    Sources/Pruefstand/Settings.swift \
+    Sources/Pruefstand/IgnoredPullRequests.swift \
+    Sources/Pruefstand/PRStore.swift \
+    Tests/IgnoreChecks/main.swift \
+    -o .build/ignore-check
+
+.build/ignore-check
+
+swiftc \
+    Sources/Pruefstand/Models.swift \
+    Sources/Pruefstand/Labels.swift \
     Sources/Pruefstand/PRCommand.swift \
     Tests/NudgeCommandChecks/main.swift \
     -o .build/nudge-command-check

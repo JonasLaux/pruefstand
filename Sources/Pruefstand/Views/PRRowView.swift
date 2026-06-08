@@ -106,7 +106,7 @@ struct PRRowView: View {
     }
 
     private var visibleActions: [PRAction] {
-        commandActions + [.approve, .close]
+        commandActions + [.ignore, .approve, .close]
     }
 
     private var actionButtonColumns: [GridItem] {
@@ -183,6 +183,7 @@ struct PRRowView: View {
 
     private func actionTint(for action: PRAction) -> Color {
         switch action {
+        case .ignore: return .secondary
         case .approve: return .green
         case .close: return .red
         case .nudge: return .blue

@@ -31,6 +31,20 @@ struct SettingsView: View {
                 Toggle("Paused", isOn: $settings.notificationsPaused)
             }
 
+            Section("Ignored PRs") {
+                HStack {
+                    Text("\(settings.ignoredPRKeys.count) ignored")
+                    Spacer()
+                    Button("Clear") {
+                        settings.clearIgnoredPRs()
+                    }
+                    .disabled(settings.ignoredPRKeys.isEmpty)
+                }
+                Text("Ignored PRs are stored locally by repo and number.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Commands") {
                 commandEditor("Nudge", text: $settings.nudgeCommand)
                 commandEditor("Urgent nudge", text: $settings.urgentNudgeCommand)

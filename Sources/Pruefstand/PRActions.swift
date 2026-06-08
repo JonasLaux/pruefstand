@@ -1,6 +1,7 @@
 import Foundation
 
 enum PRAction: Equatable, Hashable {
+    case ignore
     case approve
     case close
     case nudge
@@ -8,6 +9,7 @@ enum PRAction: Equatable, Hashable {
 
     var label: String {
         switch self {
+        case .ignore: return "Ignore"
         case .approve: return "Approve"
         case .close: return "Close"
         case .nudge: return "Nudge"
@@ -17,6 +19,7 @@ enum PRAction: Equatable, Hashable {
 
     var promptTitle: String {
         switch self {
+        case .ignore: return "Ignore this PR?"
         case .approve: return "Approve this PR?"
         case .close: return "Close this PR?"
         case .nudge: return "Run nudge?"
@@ -26,6 +29,7 @@ enum PRAction: Equatable, Hashable {
 
     var promptDetail: String {
         switch self {
+        case .ignore: return "Hide locally by repo and PR number."
         case .approve: return "Submit an approval review."
         case .close: return "Close without merging."
         case .nudge: return "Run your configured nudge command."
@@ -35,6 +39,7 @@ enum PRAction: Equatable, Hashable {
 
     var dryRunDetail: String {
         switch self {
+        case .ignore: return "Debug mode: no local ignore will be saved."
         case .approve, .close: return "Debug mode: no GitHub action will be sent."
         case .nudge, .urgentNudge: return "Debug mode: no command will be run."
         }
@@ -42,6 +47,7 @@ enum PRAction: Equatable, Hashable {
 
     var successMessage: String {
         switch self {
+        case .ignore: return "Ignored"
         case .approve: return "Approved"
         case .close: return "Closed"
         case .nudge: return "Nudged"
@@ -51,6 +57,7 @@ enum PRAction: Equatable, Hashable {
 
     var progressMessage: String {
         switch self {
+        case .ignore: return "Ignoring..."
         case .approve: return "Approving..."
         case .close: return "Closing..."
         case .nudge: return "Nudging..."
@@ -60,6 +67,7 @@ enum PRAction: Equatable, Hashable {
 
     var systemImage: String {
         switch self {
+        case .ignore: return "eye.slash"
         case .approve: return "checkmark"
         case .close: return "xmark"
         case .nudge: return "bell"
@@ -70,14 +78,14 @@ enum PRAction: Equatable, Hashable {
     var isGitHubMutation: Bool {
         switch self {
         case .approve, .close: return true
-        case .nudge, .urgentNudge: return false
+        case .ignore, .nudge, .urgentNudge: return false
         }
     }
 
     var removesPRFromListOnSuccess: Bool {
         switch self {
         case .approve, .close: return true
-        case .nudge, .urgentNudge: return false
+        case .ignore, .nudge, .urgentNudge: return false
         }
     }
 
@@ -87,7 +95,7 @@ enum PRAction: Equatable, Hashable {
             return ["pr", "review", url, "--approve"]
         case .close:
             return ["pr", "close", url]
-        case .nudge, .urgentNudge:
+        case .ignore, .nudge, .urgentNudge:
             preconditionFailure("\(label) is a local command action, not a gh action")
         }
     }
