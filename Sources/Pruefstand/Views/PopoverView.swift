@@ -22,11 +22,14 @@ struct PopoverView: View {
     }
 
     private var topBar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             repoFilterMenu
+                .frame(minWidth: 0, maxWidth: 118, alignment: .leading)
             tagFilterMenu
+                .frame(minWidth: 0, maxWidth: 88, alignment: .leading)
             sortMenu
-            Spacer()
+                .frame(minWidth: 0, maxWidth: 148, alignment: .leading)
+            Spacer(minLength: 0)
             if store.isLoading {
                 ProgressView().controlSize(.small)
             }
@@ -59,10 +62,11 @@ struct PopoverView: View {
                 }
             }
         } label: {
-            Label(tagFilterLabel, systemImage: "tag")
+            menuLabel(tagFilterLabel, systemImage: "tag")
         }
         .menuStyle(.borderlessButton)
-        .fixedSize()
+        .lineLimit(1)
+        .help(tagFilterLabel)
     }
 
     private func tagFilterButton(_ filter: TagFilter) -> some View {
@@ -99,10 +103,11 @@ struct PopoverView: View {
                 }
             }
         } label: {
-            Label(repoFilterLabel, systemImage: "line.3.horizontal.decrease.circle")
+            menuLabel(repoFilterLabel, systemImage: "line.3.horizontal.decrease.circle")
         }
         .menuStyle(.borderlessButton)
-        .fixedSize()
+        .lineLimit(1)
+        .help(repoFilterLabel)
     }
 
     private var repoFilterLabel: String {
@@ -121,10 +126,22 @@ struct PopoverView: View {
                 }
             }
         } label: {
-            Label("Sort: \(settings.sortKey.label)", systemImage: "arrow.up.arrow.down")
+            menuLabel("Sort: \(settings.sortKey.label)", systemImage: "arrow.up.arrow.down")
         }
         .menuStyle(.borderlessButton)
-        .fixedSize()
+        .lineLimit(1)
+        .help("Sort: \(settings.sortKey.label)")
+    }
+
+    private func menuLabel(_ title: String, systemImage: String) -> some View {
+        Label {
+            Text(title)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        } icon: {
+            Image(systemName: systemImage)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
@@ -184,12 +201,18 @@ struct PopoverView: View {
                     settings.notificationsPaused ? "Notifications paused" : "Notifications on",
                     systemImage: settings.notificationsPaused ? "bell.slash" : "bell"
                 )
+                .lineLimit(1)
+                .truncationMode(.tail)
             }
             .buttonStyle(.borderless)
+            .frame(maxWidth: 190, alignment: .leading)
+            .help(settings.notificationsPaused ? "Notifications paused" : "Notifications on")
             if actionMode == .dryRun {
                 Label("Dry-run", systemImage: "hammer")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
             }
             Spacer()
             Button(action: onOpenSettings) {

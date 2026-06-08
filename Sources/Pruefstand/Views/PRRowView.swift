@@ -26,12 +26,13 @@ struct PRRowView: View {
     }
 
     private var rowContent: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: 10) {
             Button(action: open) {
                 HStack(alignment: .top, spacing: 10) {
                     avatar
                     textStack
-                    Spacer(minLength: 0)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .layoutPriority(1)
                 }
                 .contentShape(Rectangle())
             }
@@ -40,10 +41,11 @@ struct PRRowView: View {
 
             actionButtons
                 .padding(.top, 1)
+                .fixedSize(horizontal: true, vertical: false)
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 7)
         .padding(.leading, 10)
-        .padding(.trailing, 30)
+        .padding(.trailing, 12)
     }
 
     private var textStack: some View {
@@ -51,29 +53,17 @@ struct PRRowView: View {
             Text(pr.title)
                 .font(.system(size: 13, weight: .medium))
                 .lineLimit(2)
+                .truncationMode(.tail)
                 .multilineTextAlignment(.leading)
-            HStack(spacing: 6) {
-                Text(pr.repo)
-                    .foregroundStyle(.secondary)
-                Text("#\(pr.number)")
-                    .foregroundStyle(.tertiary)
-            }
-            .font(.system(size: 11))
+                .help(pr.title)
+            repoLine
             if !pr.labels.isEmpty {
                 tagRow
             }
-            HStack(alignment: .top, spacing: 10) {
-                Label(pr.authorLogin, systemImage: "person")
-                Label(relativeAge, systemImage: "clock")
-                DiffStatsView(stats: pr.diffStats)
-                Label("\(pr.commentCount)", systemImage: "bubble.left")
-                ciBadge
-            }
-            .font(.system(size: 10))
-            .foregroundStyle(.secondary)
-            .labelStyle(.titleAndIcon)
+            metadataRow
             statusLine
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var actionButtons: some View {
@@ -82,12 +72,12 @@ struct PRRowView: View {
                 VStack(spacing: 6) {
                     actionButtonList
                 }
-                .frame(width: 20)
+                .frame(width: 20, alignment: .top)
             } else {
                 LazyVGrid(columns: actionButtonColumns, spacing: 6) {
                     actionButtonList
                 }
-                .frame(width: 46)
+                .frame(width: 46, alignment: .top)
             }
         }
     }
@@ -120,17 +110,79 @@ struct PRRowView: View {
     private var statusLine: some View {
         switch actionStatus {
         case .succeeded(let action, let dryRun):
-            Text(dryRun ? "Dry-run: would \(action.label.lowercased())" : action.successMessage)
+            let message = dryRun ? "Dry-run: would \(action.label.lowercased())" : action.successMessage
+            Text(message)
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(dryRun ? Color.secondary : Color.green)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .help(message)
         case .failed(_, let message):
             Text(message)
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(.red)
                 .lineLimit(1)
+                .truncationMode(.tail)
+                .help(message)
         case .running, nil:
             EmptyView()
         }
+    }
+
+    private var repoLine: some View {
+        HStack(spacing: 6) {
+            Text(pr.repo)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .layoutPriority(1)
+                .help(pr.repo)
+            Text("#\(pr.number)")
+                .foregroundStyle(.tertiary)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+        }
+        .font(.system(size: 11))
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var metadataRow: some View {
+        HStack(alignment: .center, spacing: 8) {
+            authorMetadata
+            metadataLabel(relativeAge, systemImage: "clock")
+            DiffStatsView(stats: pr.diffStats)
+            metadataLabel(
+                compactCount(pr.commentCount),
+                systemImage: "bubble.left",
+                help: "\(pr.commentCount) comments"
+            )
+            ciBadge
+                .fixedSize(horizontal: true, vertical: false)
+        }
+        .font(.system(size: 10))
+        .foregroundStyle(.secondary)
+        .labelStyle(.titleAndIcon)
+        .lineLimit(1)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var authorMetadata: some View {
+        Label {
+            Text(pr.authorLogin)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        } icon: {
+            Image(systemName: "person")
+        }
+        .frame(maxWidth: 72, alignment: .leading)
+        .help(pr.authorLogin)
+    }
+
+    private func metadataLabel(_ title: String, systemImage: String, help: String? = nil) -> some View {
+        Label(title, systemImage: systemImage)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            .help(help ?? title)
     }
 
     private func confirmationOverlay(for action: PRAction) -> some View {
@@ -208,15 +260,18 @@ struct PRRowView: View {
                 TagChip(label: label)
             }
             if pr.labels.count > 3 {
+                let remainingLabels = pr.labels.dropFirst(3).map(\.name).joined(separator: ", ")
                 Text("+\(pr.labels.count - 3)")
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 2)
                     .background(.secondary.opacity(0.14), in: Capsule())
+                    .help(remainingLabels)
             }
         }
         .lineLimit(1)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var avatar: some View {
@@ -260,13 +315,16 @@ private struct DiffStatsView: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Text("+\(stats.additions)")
+            Text("+\(compactCount(stats.additions))")
                 .foregroundStyle(.green)
-            Text("-\(stats.deletions)")
+            Text("-\(compactCount(stats.deletions))")
                 .foregroundStyle(.red)
-            Label("\(stats.changedFiles)", systemImage: "doc.text")
+            Label(compactCount(stats.changedFiles), systemImage: "doc.text")
                 .labelStyle(.titleAndIcon)
         }
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
+        .help("+\(stats.additions) additions, -\(stats.deletions) deletions, \(stats.changedFiles) changed files")
     }
 }
 
@@ -299,6 +357,9 @@ private struct TagChip: View {
         Text(label.name)
             .font(.system(size: 9, weight: .semibold))
             .lineLimit(1)
+            .truncationMode(.tail)
+            .frame(maxWidth: 96, alignment: .leading)
+            .help(label.name)
             .foregroundStyle(chipColor)
             .padding(.horizontal, 5)
             .padding(.vertical, 2)
@@ -314,6 +375,25 @@ private struct TagChip: View {
         }
         return Color(nsColor: color)
     }
+}
+
+private func compactCount(_ value: Int) -> String {
+    let sign = value < 0 ? "-" : ""
+    let magnitude = abs(value)
+
+    if magnitude >= 1_000_000 {
+        let whole = magnitude / 1_000_000
+        let decimal = (magnitude % 1_000_000) / 100_000
+        return decimal == 0 ? "\(sign)\(whole)m" : "\(sign)\(whole).\(decimal)m"
+    }
+
+    if magnitude >= 1_000 {
+        let whole = magnitude / 1_000
+        let decimal = (magnitude % 1_000) / 100
+        return decimal == 0 ? "\(sign)\(whole)k" : "\(sign)\(whole).\(decimal)k"
+    }
+
+    return "\(value)"
 }
 
 private extension NSColor {
