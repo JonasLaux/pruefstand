@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct PRRowView: View {
@@ -249,7 +250,7 @@ struct PRRowView: View {
         Image(systemName: pr.ci.symbolName)
             .frame(width: 12, height: 12)
             .foregroundStyle(Color(pr.ci.color))
-            .help(pr.ciTooltip)
+            .cachedTooltip(pr.ciTooltip)
     }
 
     private var commentBadges: some View {
@@ -334,7 +335,203 @@ private struct IconNumberBadge: View {
         .foregroundStyle(color)
         .lineLimit(1)
         .fixedSize(horizontal: true, vertical: false)
-        .help(help)
+        .cachedTooltip(help)
+    }
+}
+
+private struct CachedHoverTooltip: ViewModifier {
+    let text: String
+    private let tooltipWidth: CGFloat = 220
+    @State private var isHovering = false
+    @State private var isPresented = false
+    @State private var revealTask: Task<Void, Never>?
+
+    func body(content: Content) -> some View {
+        content
+            .contentShape(Rectangle())
+            .overlay {
+                TooltipAnchorView(text: text, width: tooltipWidth, isPresented: isPresented)
+                    .allowsHitTesting(false)
+            }
+            .onHover { hovering in
+                isHovering = hovering
+                revealTask?.cancel()
+                if hovering {
+                    revealTask = Task {
+                        try? await Task.sleep(for: .milliseconds(90))
+                        guard !Task.isCancelled else { return }
+                        await MainActor.run {
+                            if isHovering {
+                                isPresented = true
+                            }
+                        }
+                    }
+                } else {
+                    isPresented = false
+                }
+            }
+            .onDisappear {
+                revealTask?.cancel()
+                isHovering = false
+                isPresented = false
+            }
+    }
+}
+
+private struct TooltipAnchorView: NSViewRepresentable {
+    let text: String
+    let width: CGFloat
+    let isPresented: Bool
+
+    func makeNSView(context: Context) -> TooltipAnchorNSView {
+        TooltipAnchorNSView()
+    }
+
+    func updateNSView(_ nsView: TooltipAnchorNSView, context: Context) {
+        if isPresented {
+            TooltipPanelPresenter.shared.show(text: text, width: width, anchoredTo: nsView)
+        } else {
+            TooltipPanelPresenter.shared.hide(anchor: nsView)
+        }
+    }
+
+    static func dismantleNSView(_ nsView: TooltipAnchorNSView, coordinator: ()) {
+        TooltipPanelPresenter.shared.hide(anchor: nsView)
+    }
+}
+
+private final class TooltipAnchorNSView: NSView {
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil {
+            TooltipPanelPresenter.shared.hide(anchor: self)
+        }
+    }
+}
+
+@MainActor
+private final class TooltipPanelPresenter {
+    static let shared = TooltipPanelPresenter()
+
+    private let horizontalInset: CGFloat = 8
+    private let verticalGap: CGFloat = 6
+    private var panel: NSPanel?
+    private var hostingController: NSHostingController<TooltipBubble>?
+    private weak var currentAnchor: NSView?
+
+    private init() {}
+
+    func show(text: String, width: CGFloat, anchoredTo anchor: NSView) {
+        guard anchor.window != nil else { return }
+
+        currentAnchor = anchor
+        let hostingController = hostingController(for: text, width: width)
+        hostingController.view.frame = NSRect(x: 0, y: 0, width: width, height: 1)
+        hostingController.view.layoutSubtreeIfNeeded()
+
+        let fittingSize = hostingController.view.fittingSize
+        let panelSize = NSSize(width: max(width, fittingSize.width), height: fittingSize.height)
+        hostingController.view.frame = NSRect(origin: .zero, size: panelSize)
+
+        let panel = panel(for: hostingController.view)
+        panel.setFrame(frame(for: panelSize, anchoredTo: anchor), display: true)
+        panel.orderFrontRegardless()
+    }
+
+    func hide(anchor: NSView) {
+        guard currentAnchor === anchor else { return }
+        hide()
+    }
+
+    private func hide() {
+        panel?.orderOut(nil)
+        currentAnchor = nil
+    }
+
+    private func hostingController(for text: String, width: CGFloat) -> NSHostingController<TooltipBubble> {
+        let bubble = TooltipBubble(text: text, width: width)
+        if let hostingController {
+            hostingController.rootView = bubble
+            return hostingController
+        }
+
+        let hostingController = NSHostingController(rootView: bubble)
+        hostingController.view.wantsLayer = true
+        self.hostingController = hostingController
+        return hostingController
+    }
+
+    private func panel(for contentView: NSView) -> NSPanel {
+        if let panel {
+            return panel
+        }
+
+        let panel = NSPanel(
+            contentRect: .zero,
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = false
+        panel.ignoresMouseEvents = true
+        panel.level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
+        panel.contentView = contentView
+        self.panel = panel
+        return panel
+    }
+
+    private func frame(for size: NSSize, anchoredTo anchor: NSView) -> NSRect {
+        guard let anchorWindow = anchor.window else {
+            return NSRect(origin: .zero, size: size)
+        }
+
+        let anchorRectInWindow = anchor.convert(anchor.bounds, to: nil)
+        let anchorRect = anchorWindow.convertToScreen(anchorRectInWindow)
+        let visibleFrame = anchorWindow.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
+
+        let maxX = visibleFrame.maxX - size.width - horizontalInset
+        let minX = visibleFrame.minX + horizontalInset
+        let x = max(minX, min(anchorRect.minX - horizontalInset, maxX))
+
+        let preferredY = anchorRect.maxY + verticalGap
+        let maxY = visibleFrame.maxY - size.height - verticalGap
+        let minY = visibleFrame.minY + verticalGap
+        let y = max(minY, min(preferredY, maxY))
+
+        return NSRect(x: x, y: y, width: size.width, height: size.height)
+    }
+}
+
+private struct TooltipBubble: View {
+    let text: String
+    let width: CGFloat
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 11, weight: .medium))
+            .lineLimit(8)
+            .multilineTextAlignment(.leading)
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .frame(width: width, alignment: .leading)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(.secondary.opacity(0.28), lineWidth: 0.8)
+            }
+            .shadow(color: .black.opacity(0.22), radius: 10, y: 4)
+            .fixedSize(horizontal: false, vertical: true)
+            .allowsHitTesting(false)
+    }
+}
+
+private extension View {
+    func cachedTooltip(_ text: String) -> some View {
+        modifier(CachedHoverTooltip(text: text))
     }
 }
 

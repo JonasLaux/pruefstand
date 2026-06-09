@@ -126,6 +126,11 @@ SwiftUI view and AppKit panel stay in sync. Row metadata is constrained to
 single-line compact groups to avoid overlap or wrapping when comments, unresolved
 threads, diff stats, and CI status are all present.
 
+Status hover details use an app-level non-activating tooltip panel instead of
+native `.help` or row-local SwiftUI overlays. The panel is anchored from the
+hovered badge's screen coordinates with a short reveal delay, which keeps
+tooltips responsive during refreshes and prevents row clipping from hiding them.
+
 **Top bar:** repo filter (multi-select menu), tag filter, sort dropdown, manual
 refresh button.
 

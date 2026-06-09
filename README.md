@@ -11,6 +11,10 @@ Each PR row shows compact review status metadata:
 - CI rollup state, with a hover tooltip listing failed check runs/status contexts when CI fails
 - labels, diff stats, author, age, repo, and PR number in a single-line row layout
 
+Status hover details use a short-delay cached tooltip panel anchored to the
+hovered badge, so CI and unresolved-comment details remain available while the
+popover refreshes and are not clipped by the row layout.
+
 ## Getting started
 
 1. Make sure the GitHub CLI is installed and authenticated:
@@ -100,7 +104,8 @@ Run the lightweight repository checks before committing:
 
 The script compiles focused Swift checks for launch/action behavior, settings,
 filters, nudge command interpolation, PR status metadata decoding, GraphQL query
-budget guardrails, and popover layout invariants.
+budget guardrails, popover layout invariants, and status tooltip interaction
+behavior.
 
 ## Nudge commands
 

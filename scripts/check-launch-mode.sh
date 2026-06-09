@@ -40,6 +40,12 @@ swiftc \
 .build/popover-layout-check
 
 swiftc \
+    Tests/TooltipInteractionChecks/main.swift \
+    -o .build/tooltip-interaction-check
+
+.build/tooltip-interaction-check
+
+swiftc \
     Sources/Pruefstand/LaunchMode.swift \
     Sources/Pruefstand/PRActions.swift \
     Tests/ActionModeChecks/main.swift \
