@@ -5,7 +5,7 @@ struct PRRowView: View {
     let pr: PullRequest
     let actionStatus: PRActionStatus?
     let actionMode: PRActionMode
-    let commandActions: [PRAction]
+    let actions: [PRAction]
     let onAction: (PRAction, PullRequest) -> Void
 
     @State private var pendingAction: PRAction?
@@ -87,7 +87,7 @@ struct PRRowView: View {
 
     private var actionButtons: some View {
         Group {
-            if visibleActions.count <= 2 {
+            if actions.count <= 2 {
                 VStack(spacing: 6) {
                     actionButtonList
                 }
@@ -103,7 +103,7 @@ struct PRRowView: View {
 
     @ViewBuilder
     private var actionButtonList: some View {
-        ForEach(visibleActions, id: \.self) { action in
+        ForEach(actions, id: \.self) { action in
             RoundActionButton(
                 systemImage: action.systemImage,
                 color: actionTint(for: action),
@@ -112,10 +112,6 @@ struct PRRowView: View {
                 pendingAction = action
             }
         }
-    }
-
-    private var visibleActions: [PRAction] {
-        commandActions + [.ignore, .approve, .close]
     }
 
     private var actionButtonColumns: [GridItem] {

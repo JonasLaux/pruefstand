@@ -19,7 +19,7 @@ final class PreviewAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        store.setRaw(PreviewPullRequests.samples(relativeTo: Date()))
+        store.setFetched(PreviewPullRequests.samples(relativeTo: Date()))
 
         let content = PreviewWindowContent(store: store, settings: settings, actionMode: actionMode)
         let hosting = NSHostingView(rootView: content)
@@ -103,7 +103,7 @@ private struct PreviewWindowContent: View {
         Task {
             try? await Task.sleep(for: .milliseconds(650))
             await MainActor.run {
-                store.setRaw(PreviewPullRequests.samples(relativeTo: Date()))
+                store.setFetched(PreviewPullRequests.samples(relativeTo: Date()))
                 store.isLoading = false
             }
         }
@@ -122,7 +122,69 @@ private struct PreviewWindowContent: View {
 }
 
 private enum PreviewPullRequests {
-    static func samples(relativeTo now: Date) -> [PullRequest] {
+    static func samples(relativeTo now: Date) -> PRFetchResult {
+        PRFetchResult(
+            myPullRequests: myPullRequestSamples(relativeTo: now),
+            reviewNeeded: reviewNeededSamples(relativeTo: now)
+        )
+    }
+
+    private static func myPullRequestSamples(relativeTo now: Date) -> [PullRequest] {
+        [
+            sample(
+                number: 241,
+                title: "Add review-needed tabs and horizontal trackpad switching",
+                repo: "jonaslaux/pruefstand",
+                author: "jonaslaux",
+                createdAt: now.addingTimeInterval(-54 * 60),
+                updatedAt: now.addingTimeInterval(-11 * 60),
+                comments: 5,
+                reviewComments: 2,
+                unresolvedReviewThreadsByAuthor: [
+                    ReviewThreadAuthorCount(author: "mira", count: 1)
+                ],
+                ci: .success,
+                diffStats: PRDiffStats(additions: 156, deletions: 29, changedFiles: 4),
+                labels: [
+                    PRLabel(name: "area:popover", colorHex: "1d76db"),
+                    PRLabel(name: "ui", colorHex: "5319e7")
+                ]
+            ),
+            sample(
+                number: 382,
+                title: "Split notification state from preview-window launch state",
+                repo: "tools/review-surface",
+                author: "jonaslaux",
+                createdAt: now.addingTimeInterval(-19 * 60 * 60),
+                updatedAt: now.addingTimeInterval(-2 * 60 * 60),
+                comments: 1,
+                ci: .pending,
+                diffStats: PRDiffStats(additions: 83, deletions: 16, changedFiles: 3),
+                labels: [
+                    PRLabel(name: "complexity:low", colorHex: "0e8a16")
+                ]
+            ),
+            sample(
+                number: 114,
+                title: "Tidy command interpolation docs for local review nudges",
+                repo: "example/desktop-shell",
+                author: "jonaslaux",
+                createdAt: now.addingTimeInterval(-2 * 24 * 60 * 60),
+                updatedAt: now.addingTimeInterval(-6 * 60 * 60),
+                comments: 8,
+                ci: .failure,
+                failedCIChecks: [
+                    FailedCICheck(name: "Docs smoke test")
+                ],
+                diffStats: PRDiffStats(additions: 37, deletions: 11, changedFiles: 2),
+                labels: [
+                    PRLabel(name: "docs", colorHex: "0075ca")
+                ]
+            )
+        ]
+    }
+
+    private static func reviewNeededSamples(relativeTo now: Date) -> [PullRequest] {
         [
             sample(
                 number: 482,

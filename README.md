@@ -3,6 +3,7 @@
 A small macOS menu bar app for tracking GitHub pull requests that need your review.
 
 It uses the locally authenticated `gh` CLI, polls for open review requests, shows them in a popover, and can send native notifications for newly surfaced PRs.
+The popover has tabs for your open PRs and PRs needing your review; swipe horizontally with two fingers to switch between them.
 
 Each PR row shows compact review status metadata:
 

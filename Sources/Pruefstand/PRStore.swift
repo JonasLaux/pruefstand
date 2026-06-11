@@ -1,11 +1,11 @@
 import Foundation
 import Combine
 
-/// Single source of truth for the UI. Holds the raw fetched list and exposes a
-/// derived (filtered + sorted) list.
+/// Single source of truth for the UI. Holds the raw fetched lists and exposes
+/// derived (filtered + sorted) lists.
 @MainActor
 final class PRStore: ObservableObject {
-    @Published private(set) var raw: [PullRequest] = []
+    @Published private(set) var rawByTab: [PullRequestTab: [PullRequest]] = [:]
     @Published var lastError: String?
     @Published var isLoading = false
     @Published private(set) var actionStatuses: [String: PRActionStatus] = [:]
@@ -21,12 +21,32 @@ final class PRStore: ObservableObject {
             .store(in: &cancellables)
     }
 
+    var raw: [PullRequest] {
+        raw(for: .reviewNeeded)
+    }
+
+    func raw(for tab: PullRequestTab) -> [PullRequest] {
+        rawByTab[tab] ?? []
+    }
+
     func setRaw(_ prs: [PullRequest]) {
-        raw = prs
+        setRaw(prs, for: .reviewNeeded)
+    }
+
+    func setRaw(_ prs: [PullRequest], for tab: PullRequestTab) {
+        rawByTab[tab] = prs
+    }
+
+    func setFetched(_ result: PRFetchResult) {
+        for tab in PullRequestTab.allCases {
+            rawByTab[tab] = result.pullRequests(for: tab)
+        }
     }
 
     func remove(id: String) {
-        raw.removeAll { $0.id == id }
+        for tab in PullRequestTab.allCases {
+            rawByTab[tab]?.removeAll { $0.id == id }
+        }
         actionStatuses[id] = nil
     }
 
@@ -44,23 +64,39 @@ final class PRStore: ObservableObject {
 
     /// Repos present in the current results, sorted.
     var availableRepos: [String] {
-        Array(Set(raw.map(\.repo))).sorted()
+        availableRepos(for: .reviewNeeded)
+    }
+
+    func availableRepos(for tab: PullRequestTab) -> [String] {
+        Array(Set(raw(for: tab).map(\.repo))).sorted()
     }
 
     var availableLabels: [PRLabel] {
-        let byName = Dictionary(grouping: raw.flatMap(\.labels), by: { $0.name.lowercased() })
+        availableLabels(for: .reviewNeeded)
+    }
+
+    func availableLabels(for tab: PullRequestTab) -> [PRLabel] {
+        let byName = Dictionary(grouping: raw(for: tab).flatMap(\.labels), by: { $0.name.lowercased() })
         return byName.values
             .compactMap { $0.first }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     var availableTagPrefixes: [TagFilter] {
-        TagFilter.prefixOptions(from: availableLabels)
+        availableTagPrefixes(for: .reviewNeeded)
+    }
+
+    func availableTagPrefixes(for tab: PullRequestTab) -> [TagFilter] {
+        TagFilter.prefixOptions(from: availableLabels(for: tab))
     }
 
     /// Filtered + sorted list shown in the UI.
     var displayed: [PullRequest] {
-        var list = raw.filter { !settings.isBlocked(author: $0.authorLogin) && !settings.isIgnored($0) }
+        displayed(for: .reviewNeeded)
+    }
+
+    func displayed(for tab: PullRequestTab) -> [PullRequest] {
+        var list = raw(for: tab).filter { !settings.isBlocked(author: $0.authorLogin) && !settings.isIgnored($0) }
         if !settings.repoFilter.isEmpty {
             list = list.filter { settings.repoFilter.contains($0.repo) }
         }

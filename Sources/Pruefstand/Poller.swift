@@ -72,14 +72,14 @@ final class Poller {
 
         store.isLoading = true
         do {
-            let prs = try await client.fetch(
+            let result = try await client.fetch(
                 direct: settings.toggleDirect,
                 teams: settings.toggleTeams,
                 mentioned: settings.toggleMentioned
             )
-            store.setRaw(prs)
+            store.setFetched(result)
             store.lastError = nil
-            notifier.process(current: store.displayed, settings: settings)
+            notifier.process(current: store.displayed(for: .reviewNeeded), settings: settings)
         } catch {
             store.lastError = (error as? GHError)?.message ?? error.localizedDescription
         }

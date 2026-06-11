@@ -95,7 +95,7 @@ final class MenuBarController: NSObject, NSWindowDelegate {
     }
 
     private func updateBadge() {
-        let count = store.displayed.count
+        let count = store.displayed(for: .reviewNeeded).count
         statusItem.button?.title = count > 0 ? " \(count)" : ""
     }
 

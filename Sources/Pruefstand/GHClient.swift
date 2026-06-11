@@ -66,10 +66,11 @@ actor GHClient {
     }
     """
 
-    /// Fetch review-needed PRs for the given toggles, merged and deduped by id.
-    func fetch(direct: Bool, teams: Bool, mentioned: Bool) async throws -> [PullRequest] {
+    /// Fetch authored PRs plus review-needed PRs for the given toggles.
+    func fetch(direct: Bool, teams: Bool, mentioned: Bool) async throws -> PRFetchResult {
         let ghPath = try resolveGH()
         let base = "is:open is:pr"
+        let myPullRequests = try runSearch(ghPath: ghPath, q: "\(base) author:@me")
         var queries: [String] = []
 
         // Teams is a superset of direct; only fall back to the direct-only
@@ -92,7 +93,10 @@ actor GHClient {
                 byId[pr.id] = pr
             }
         }
-        return Array(byId.values)
+        return PRFetchResult(
+            myPullRequests: myPullRequests,
+            reviewNeeded: Array(byId.values)
+        )
     }
 
     func perform(action: PRAction, onURL url: String) async throws {

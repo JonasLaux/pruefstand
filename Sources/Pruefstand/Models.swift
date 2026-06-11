@@ -42,6 +42,39 @@ struct FailedCICheck: Equatable, Identifiable {
     let name: String
 }
 
+enum PullRequestTab: String, CaseIterable, Identifiable, Hashable {
+    case myPullRequests
+    case reviewNeeded
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .myPullRequests: return "My Pull Requests"
+        case .reviewNeeded: return "My Review Needed"
+        }
+    }
+
+    var emptyTitle: String {
+        switch self {
+        case .myPullRequests: return "No open pull requests"
+        case .reviewNeeded: return "Nothing to review"
+        }
+    }
+}
+
+struct PRFetchResult {
+    let myPullRequests: [PullRequest]
+    let reviewNeeded: [PullRequest]
+
+    func pullRequests(for tab: PullRequestTab) -> [PullRequest] {
+        switch tab {
+        case .myPullRequests: return myPullRequests
+        case .reviewNeeded: return reviewNeeded
+        }
+    }
+}
+
 struct ReviewThreadAuthorCount: Equatable, Identifiable {
     var id: String { author }
 
