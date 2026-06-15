@@ -3,7 +3,7 @@
 A small macOS menu bar app for tracking GitHub pull requests that need your review.
 
 It uses the locally authenticated `gh` CLI, polls for open review requests, shows them in a popover, and can send native notifications for newly surfaced PRs.
-The popover has two tabs, **My Pull Requests** (the PRs you authored) and **My Review Needed** (PRs requesting your review); swipe horizontally with two fingers, or click the segmented control, to switch between them. A toolbar above the list filters by repo or tag and changes the sort order (created, updated, repo, or CI state).
+The popover has two tabs, **My Pull Requests** (the PRs you authored) and **My Review Needed** (PRs requesting your review); swipe horizontally with two fingers, or click the segmented control, to switch between them. A toolbar above the list filters by repo or tag and changes the sort order (created, updated, repo, or CI state). The popover footer has a button to pause and resume notifications without opening Settings.
 
 Each PR row shows compact review status metadata:
 
@@ -60,8 +60,12 @@ swift run Pruefstand --preview
 ```
 
 3. Open Settings from the menu bar popover and choose which PRs to watch.
+   - Set the **Polling** interval (1-120 minutes) for how often Pruefstand
+     refreshes.
    - Under **Which PRs**, set the review scope: **My teams** (includes direct
      requests), **Directly requested to me**, or **Mentioned me**.
+   - Under **Notifications**, toggle native notifications on/off, or pause them
+     temporarily (also available from the popover footer).
    - Use **Watched repos** to scope the list to one or more repositories.
    - Use **Watched contributors** to check one or more active authors, or add a
      login manually, to include PRs even when you are not requested as a reviewer.
