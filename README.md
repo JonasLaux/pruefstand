@@ -44,6 +44,10 @@ swift run Pruefstand --preview
 ```
 
 3. Open Settings from the menu bar popover and choose which PRs to watch.
+   - Use **Watched repos** to scope the list to one or more repositories.
+   - Use **Watched contributors** to check one or more active authors, or add a
+     login manually, to include PRs even when you are not requested as a reviewer.
+   - Toggle **Include drafts** when draft PRs should be shown too.
 
 4. Optional: configure [Nudge commands](#nudge-commands) so each PR row can run
 your own local reminder workflow. For example, this asks Codex to draft a review

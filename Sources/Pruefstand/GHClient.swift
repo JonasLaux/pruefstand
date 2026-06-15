@@ -1,5 +1,80 @@
 import Foundation
 
+enum PullRequestSearchQuery {
+    static func base(includeDrafts: Bool) -> String {
+        includeDrafts ? "is:open is:pr" : "is:open is:pr -is:draft"
+    }
+
+    static func reviewQueries(direct: Bool, teams: Bool, mentioned: Bool, includeDrafts: Bool) -> [String] {
+        let base = base(includeDrafts: includeDrafts)
+        var queries: [String] = []
+
+        // Teams is a superset of direct; only fall back to the direct-only
+        // qualifier when teams is off.
+        if teams {
+            queries.append("\(base) review-requested:@me")
+        } else if direct {
+            queries.append("\(base) user-review-requested:@me")
+        }
+        if mentioned {
+            queries.append("\(base) mentions:@me")
+        }
+        return queries
+    }
+
+    static func watchedContributorQueries(
+        repos: Set<String>,
+        contributors: [String],
+        includeDrafts: Bool
+    ) -> [String] {
+        let base = base(includeDrafts: includeDrafts)
+        let normalizedRepos = repos.compactMap(normalizedRepo).sorted()
+        let normalizedLogins = normalizedLogins(from: contributors)
+
+        if normalizedRepos.isEmpty {
+            return normalizedLogins.map { "\(base) author:\($0)" }
+        }
+
+        return normalizedRepos.flatMap { repo in
+            normalizedLogins.map { "\(base) repo:\(repo) author:\($0)" }
+        }
+    }
+
+    static func authoredByMeQuery(includeDrafts: Bool) -> String {
+        "\(base(includeDrafts: includeDrafts)) author:@me"
+    }
+
+    private static func normalizedLogins(from logins: [String]) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for login in logins {
+            let normalized = login
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingPrefix("@")
+                .lowercased()
+            guard !normalized.isEmpty, seen.insert(normalized).inserted else { continue }
+            result.append(normalized)
+        }
+        return result.sorted()
+    }
+
+    private static func normalizedRepo(_ value: String) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let withoutHost = trimmed
+            .replacingOccurrences(of: "https://github.com/", with: "")
+            .replacingOccurrences(of: "http://github.com/", with: "")
+        let parts = withoutHost
+            .split(separator: "/")
+            .prefix(2)
+            .map(String.init)
+
+        guard parts.count == 2, parts.allSatisfy({ !$0.isEmpty }) else { return nil }
+        return parts.joined(separator: "/")
+    }
+}
+
 struct GHError: LocalizedError {
     let message: String
     var errorDescription: String? { message }
@@ -38,6 +113,7 @@ actor GHClient {
               nodes { name color }
             }
             commits(last: 1) {
+              totalCount
               nodes {
                 commit {
                   statusCheckRollup {
@@ -66,36 +142,45 @@ actor GHClient {
     }
     """
 
-    /// Fetch authored PRs plus review-needed PRs for the given toggles.
-    func fetch(direct: Bool, teams: Bool, mentioned: Bool) async throws -> PRFetchResult {
+    /// Fetch authored PRs plus review-needed and watched-contributor PRs.
+    func fetch(
+        direct: Bool,
+        teams: Bool,
+        mentioned: Bool,
+        includeDrafts: Bool,
+        watchedRepos: Set<String>,
+        watchedContributors: [String]
+    ) async throws -> PRFetchResult {
         let ghPath = try resolveGH()
-        let base = "is:open is:pr"
-        let myPullRequests = try runSearch(ghPath: ghPath, q: "\(base) author:@me")
-        var queries: [String] = []
-
-        // Teams is a superset of direct; only fall back to the direct-only
-        // qualifier when teams is off.
-        if teams {
-            queries.append("\(base) review-requested:@me")
-        } else if direct {
-            queries.append("\(base) user-review-requested:@me")
-        }
-        if mentioned {
-            queries.append("\(base) mentions:@me")
-        }
+        let myPullRequests = try runSearch(ghPath: ghPath, q: PullRequestSearchQuery.authoredByMeQuery(includeDrafts: includeDrafts))
+        var queries = PullRequestSearchQuery.reviewQueries(
+            direct: direct,
+            teams: teams,
+            mentioned: mentioned,
+            includeDrafts: includeDrafts
+        )
+        queries.append(
+            contentsOf: PullRequestSearchQuery.watchedContributorQueries(
+                repos: watchedRepos,
+                contributors: watchedContributors,
+                includeDrafts: includeDrafts
+            )
+        )
         if queries.isEmpty {
-            queries.append("\(base) review-requested:@me")
+            queries.append("\(PullRequestSearchQuery.base(includeDrafts: includeDrafts)) review-requested:@me")
         }
 
         var byId: [String: PullRequest] = [:]
-        for q in queries {
+        for q in dedupe(queries) {
             for pr in try runSearch(ghPath: ghPath, q: q) {
                 byId[pr.id] = pr
             }
         }
+        let contributorCandidates = fetchContributorCandidates(ghPath: ghPath, repos: watchedRepos)
         return PRFetchResult(
             myPullRequests: myPullRequests,
-            reviewNeeded: Array(byId.values)
+            reviewNeeded: Array(byId.values),
+            contributorCandidates: contributorCandidates
         )
     }
 
@@ -142,6 +227,49 @@ actor GHClient {
         }
 
         return resp.data?.search.nodes.compactMap { $0.toPullRequest() } ?? []
+    }
+
+    private func fetchContributorCandidates(ghPath: String, repos: Set<String>) -> [RepositoryContributor] {
+        repos.sorted().flatMap { repo -> [RepositoryContributor] in
+            (try? runContributorSearch(ghPath: ghPath, repo: repo)) ?? []
+        }
+    }
+
+    private func runContributorSearch(ghPath: String, repo: String) throws -> [RepositoryContributor] {
+        let parts = repo.split(separator: "/")
+        guard parts.count == 2 else { return [] }
+
+        let (out, err, status) = try run(
+            ghPath: ghPath,
+            args: ["api", "--method", "GET", "repos/\(repo)/contributors", "-f", "per_page=100"]
+        )
+
+        guard status == 0 else {
+            let detail = err.isEmpty ? out : err
+            throw GHError(message: "gh failed (exit \(status)): \(detail.trimmingCharacters(in: .whitespacesAndNewlines))")
+        }
+
+        guard let data = out.data(using: .utf8), !data.isEmpty else {
+            return []
+        }
+
+        let nodes = try JSONDecoder().decode([RESTContributor].self, from: data)
+        return nodes.compactMap { node in
+            guard let login = node.login?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !login.isEmpty else {
+                return nil
+            }
+            return RepositoryContributor(
+                repo: repo,
+                login: login.lowercased(),
+                contributions: node.contributions ?? 0
+            )
+        }
+    }
+
+    private func dedupe(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        return values.filter { seen.insert($0).inserted }
     }
 
     /// Run a process, returning (stdout, stderr, exitCode).
@@ -202,5 +330,16 @@ actor GHClient {
         proc.waitUntilExit()
         let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
         return (path?.isEmpty == false) ? path : nil
+    }
+}
+
+private struct RESTContributor: Decodable {
+    let login: String?
+    let contributions: Int?
+}
+
+private extension String {
+    func trimmingPrefix(_ prefix: String) -> String {
+        hasPrefix(prefix) ? String(dropFirst(prefix.count)) : self
     }
 }

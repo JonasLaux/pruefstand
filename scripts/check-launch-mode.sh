@@ -34,6 +34,16 @@ swiftc \
 .build/graphql-budget-check
 
 swiftc \
+    Sources/Pruefstand/Models.swift \
+    Sources/Pruefstand/Labels.swift \
+    Sources/Pruefstand/PRActions.swift \
+    Sources/Pruefstand/GHClient.swift \
+    Tests/WatchQueryChecks/main.swift \
+    -o .build/watch-query-check
+
+.build/watch-query-check
+
+swiftc \
     Tests/PopoverLayoutChecks/main.swift \
     -o .build/popover-layout-check
 
@@ -73,6 +83,18 @@ swiftc \
     -o .build/ignore-check
 
 .build/ignore-check
+
+swiftc \
+    Sources/Pruefstand/Models.swift \
+    Sources/Pruefstand/Labels.swift \
+    Sources/Pruefstand/PRActions.swift \
+    Sources/Pruefstand/Settings.swift \
+    Sources/Pruefstand/IgnoredPullRequests.swift \
+    Sources/Pruefstand/PRStore.swift \
+    Tests/ContributorOptionChecks/main.swift \
+    -o .build/contributor-option-check
+
+.build/contributor-option-check
 
 swiftc \
     Sources/Pruefstand/Models.swift \

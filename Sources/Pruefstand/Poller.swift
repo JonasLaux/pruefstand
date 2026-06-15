@@ -75,7 +75,10 @@ final class Poller {
             let result = try await client.fetch(
                 direct: settings.toggleDirect,
                 teams: settings.toggleTeams,
-                mentioned: settings.toggleMentioned
+                mentioned: settings.toggleMentioned,
+                includeDrafts: settings.includeDrafts,
+                watchedRepos: settings.repoFilter,
+                watchedContributors: settings.watchedContributors
             )
             store.setFetched(result)
             store.lastError = nil

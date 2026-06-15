@@ -69,7 +69,7 @@ private struct PreviewWindowContent: View {
                 .tabItem { Label("Popover", systemImage: "menubar.rectangle") }
                 .tag(PreviewTab.popover)
 
-            SettingsView(settings: settings, onApply: {})
+            SettingsView(store: store, settings: settings, onApply: {})
                 .padding(.vertical, 12)
                 .tabItem { Label("Settings", systemImage: "gearshape") }
                 .tag(PreviewTab.settings)

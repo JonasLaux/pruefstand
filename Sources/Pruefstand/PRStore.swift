@@ -1,11 +1,26 @@
 import Foundation
 import Combine
 
+struct ContributorOption: Equatable, Identifiable {
+    var id: String { login }
+
+    let login: String
+    let pullRequestCount: Int
+    let commitCount: Int
+    let latestUpdatedAt: Date?
+    let isSelected: Bool
+
+    var summary: String {
+        "\(pullRequestCount) \(pullRequestCount == 1 ? "PR" : "PRs") - \(commitCount) \(commitCount == 1 ? "commit" : "commits")"
+    }
+}
+
 /// Single source of truth for the UI. Holds the raw fetched lists and exposes
 /// derived (filtered + sorted) lists.
 @MainActor
 final class PRStore: ObservableObject {
     @Published private(set) var rawByTab: [PullRequestTab: [PullRequest]] = [:]
+    @Published private(set) var contributorCandidates: [RepositoryContributor] = []
     @Published var lastError: String?
     @Published var isLoading = false
     @Published private(set) var actionStatuses: [String: PRActionStatus] = [:]
@@ -41,6 +56,7 @@ final class PRStore: ObservableObject {
         for tab in PullRequestTab.allCases {
             rawByTab[tab] = result.pullRequests(for: tab)
         }
+        contributorCandidates = result.contributorCandidates
     }
 
     func remove(id: String) {
@@ -88,6 +104,94 @@ final class PRStore: ObservableObject {
 
     func availableTagPrefixes(for tab: PullRequestTab) -> [TagFilter] {
         TagFilter.prefixOptions(from: availableLabels(for: tab))
+    }
+
+    var contributorOptions: [ContributorOption] {
+        contributorOptions(for: .reviewNeeded)
+    }
+
+    func contributorOptions(for tab: PullRequestTab) -> [ContributorOption] {
+        struct Bucket {
+            var login: String
+            var pullRequestCount: Int
+            var commitCount: Int
+            var latestUpdatedAt: Date?
+            var hasRepositoryContributions: Bool
+        }
+
+        let selected = Set(settings.watchedContributors.map { $0.lowercased() })
+        var buckets: [String: Bucket] = [:]
+
+        for contributor in contributorCandidates where settings.repoFilter.isEmpty || settings.repoFilter.contains(contributor.repo) {
+            let login = contributor.login.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !login.isEmpty else { continue }
+            let key = login.lowercased()
+            var bucket = buckets[key] ?? Bucket(
+                login: key,
+                pullRequestCount: 0,
+                commitCount: 0,
+                latestUpdatedAt: nil,
+                hasRepositoryContributions: true
+            )
+            bucket.commitCount += contributor.contributions
+            bucket.hasRepositoryContributions = true
+            buckets[key] = bucket
+        }
+
+        let repoScoped = raw(for: tab).filter { pr in
+            (settings.repoFilter.isEmpty || settings.repoFilter.contains(pr.repo)) &&
+                !settings.isBlocked(author: pr.authorLogin)
+        }
+
+        for pr in repoScoped {
+            let login = pr.authorLogin.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !login.isEmpty else { continue }
+            let key = login.lowercased()
+            var bucket = buckets[key] ?? Bucket(
+                login: key,
+                pullRequestCount: 0,
+                commitCount: 0,
+                latestUpdatedAt: nil,
+                hasRepositoryContributions: false
+            )
+            bucket.pullRequestCount += 1
+            if !bucket.hasRepositoryContributions {
+                bucket.commitCount += pr.commitCount
+            }
+            if bucket.latestUpdatedAt.map({ pr.updatedAt > $0 }) ?? true {
+                bucket.latestUpdatedAt = pr.updatedAt
+            }
+            buckets[key] = bucket
+        }
+
+        for login in selected where buckets[login] == nil {
+            buckets[login] = Bucket(
+                login: login,
+                pullRequestCount: 0,
+                commitCount: 0,
+                latestUpdatedAt: nil,
+                hasRepositoryContributions: false
+            )
+        }
+
+        return buckets.values
+            .map {
+                ContributorOption(
+                    login: $0.login,
+                    pullRequestCount: $0.pullRequestCount,
+                    commitCount: $0.commitCount,
+                    latestUpdatedAt: $0.latestUpdatedAt,
+                    isSelected: selected.contains($0.login)
+                )
+            }
+            .sorted { lhs, rhs in
+                if lhs.commitCount != rhs.commitCount { return lhs.commitCount > rhs.commitCount }
+                if lhs.pullRequestCount != rhs.pullRequestCount { return lhs.pullRequestCount > rhs.pullRequestCount }
+                if lhs.latestUpdatedAt != rhs.latestUpdatedAt {
+                    return (lhs.latestUpdatedAt ?? .distantPast) > (rhs.latestUpdatedAt ?? .distantPast)
+                }
+                return lhs.login.localizedCaseInsensitiveCompare(rhs.login) == .orderedAscending
+            }
     }
 
     /// Filtered + sorted list shown in the UI.

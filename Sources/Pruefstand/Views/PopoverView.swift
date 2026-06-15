@@ -111,15 +111,19 @@ struct PopoverView: View {
 
     private var repoFilterMenu: some View {
         Menu {
-            Button("All repos") { settings.repoFilter = [] }
+            Button("All repos") {
+                settings.repoFilter = []
+                onRefresh()
+            }
             Divider()
-            ForEach(store.availableRepos(for: selectedTab), id: \.self) { repo in
+            ForEach(currentRepoOptions, id: \.self) { repo in
                 Button {
                     if settings.repoFilter.contains(repo) {
                         settings.repoFilter.remove(repo)
                     } else {
                         settings.repoFilter.insert(repo)
                     }
+                    onRefresh()
                 } label: {
                     Label(repo, systemImage: settings.repoFilter.contains(repo) ? "checkmark" : "")
                 }
@@ -293,6 +297,10 @@ struct PopoverView: View {
 
     private var currentAvailableTagPrefixes: [TagFilter] {
         store.availableTagPrefixes(for: selectedTab)
+    }
+
+    private var currentRepoOptions: [String] {
+        Array(Set(store.availableRepos(for: selectedTab)).union(settings.repoFilter)).sorted()
     }
 
     private var currentAvailableLabels: [PRLabel] {

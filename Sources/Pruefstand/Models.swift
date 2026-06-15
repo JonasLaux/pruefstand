@@ -66,6 +66,17 @@ enum PullRequestTab: String, CaseIterable, Identifiable, Hashable {
 struct PRFetchResult {
     let myPullRequests: [PullRequest]
     let reviewNeeded: [PullRequest]
+    let contributorCandidates: [RepositoryContributor]
+
+    init(
+        myPullRequests: [PullRequest],
+        reviewNeeded: [PullRequest],
+        contributorCandidates: [RepositoryContributor] = []
+    ) {
+        self.myPullRequests = myPullRequests
+        self.reviewNeeded = reviewNeeded
+        self.contributorCandidates = contributorCandidates
+    }
 
     func pullRequests(for tab: PullRequestTab) -> [PullRequest] {
         switch tab {
@@ -73,6 +84,14 @@ struct PRFetchResult {
         case .reviewNeeded: return reviewNeeded
         }
     }
+}
+
+struct RepositoryContributor: Equatable, Identifiable {
+    var id: String { "\(repo)#\(login)" }
+
+    let repo: String
+    let login: String
+    let contributions: Int
 }
 
 struct ReviewThreadAuthorCount: Equatable, Identifiable {
@@ -125,6 +144,7 @@ struct PullRequest: Identifiable, Equatable {
     let failedCIChecks: [FailedCICheck]
     let labels: [PRLabel]
     let diffStats: PRDiffStats
+    let commitCount: Int
 
     init(
         id: String,
@@ -143,7 +163,8 @@ struct PullRequest: Identifiable, Equatable {
         ci: CIState,
         failedCIChecks: [FailedCICheck] = [],
         labels: [PRLabel],
-        diffStats: PRDiffStats
+        diffStats: PRDiffStats,
+        commitCount: Int = 0
     ) {
         self.id = id
         self.number = number
@@ -162,6 +183,7 @@ struct PullRequest: Identifiable, Equatable {
         self.failedCIChecks = failedCIChecks
         self.labels = labels
         self.diffStats = diffStats
+        self.commitCount = commitCount
     }
 }
 
@@ -285,6 +307,7 @@ struct Node: Decodable {
         }
     }
     struct Commits: Decodable {
+        let totalCount: Int?
         let nodes: [CommitNode]
         struct CommitNode: Decodable {
             let commit: Commit
@@ -385,7 +408,8 @@ struct Node: Decodable {
                 additions: additions ?? 0,
                 deletions: deletions ?? 0,
                 changedFiles: changedFiles ?? 0
-            )
+            ),
+            commitCount: commits?.totalCount ?? 0
         )
     }
 }

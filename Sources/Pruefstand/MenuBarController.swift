@@ -199,7 +199,7 @@ final class MenuBarController: NSObject, NSWindowDelegate {
             return
         }
         let hosting = NSHostingController(
-            rootView: SettingsView(settings: settings, onApply: { [weak self] in self?.onRefresh() })
+            rootView: SettingsView(store: store, settings: settings, onApply: { [weak self] in self?.onRefresh() })
         )
         let win = NSWindow(contentViewController: hosting)
         win.title = "Pruefstand Settings"
