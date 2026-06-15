@@ -3,7 +3,7 @@
 A small macOS menu bar app for tracking GitHub pull requests that need your review.
 
 It uses the locally authenticated `gh` CLI, polls for open review requests, shows them in a popover, and can send native notifications for newly surfaced PRs.
-The popover has tabs for your open PRs and PRs needing your review; swipe horizontally with two fingers to switch between them.
+The popover has two tabs, **My Pull Requests** (the PRs you authored) and **My Review Needed** (PRs requesting your review); swipe horizontally with two fingers, or click the segmented control, to switch between them. A toolbar above the list filters by repo or tag and changes the sort order (created, updated, repo, or CI state).
 
 Each PR row shows compact review status metadata:
 
@@ -15,6 +15,22 @@ Each PR row shows compact review status metadata:
 Status hover details use a short-delay cached tooltip panel anchored to the
 hovered badge, so CI and unresolved-comment details remain available while the
 popover refreshes and are not clipped by the row layout.
+
+## Row actions
+
+Each PR row exposes quick actions. The set depends on the tab:
+
+- **Approve** submits an approval review with `gh pr review --approve` (review tab only).
+- **Close** closes the PR without merging with `gh pr close`.
+- **Ignore** hides the PR locally by repo and number; it stays hidden until you
+  clear it from Settings -> Ignored PRs.
+- **Nudge** / **Urgent nudge** run your configured local commands (see
+  [Nudge commands](#nudge-commands)). They appear only when a command is set.
+
+Approve and Close prompt for confirmation and drop the PR from the list on
+success. Launch with `--debug-actions` to exercise the action UI in dry-run
+mode: prompts and progress states render, but no GitHub mutation, local ignore,
+or command is performed.
 
 ## Getting started
 
@@ -44,10 +60,17 @@ swift run Pruefstand --preview
 ```
 
 3. Open Settings from the menu bar popover and choose which PRs to watch.
+   - Under **Which PRs**, set the review scope: **My teams** (includes direct
+     requests), **Directly requested to me**, or **Mentioned me**.
    - Use **Watched repos** to scope the list to one or more repositories.
    - Use **Watched contributors** to check one or more active authors, or add a
      login manually, to include PRs even when you are not requested as a reviewer.
    - Toggle **Include drafts** when draft PRs should be shown too.
+   - Use **Hidden authors** to suppress PRs from specific logins; bot accounts
+     (`renovate`, `dependabot`, `github-actions`, and any `[bot]` login) are
+     hidden by default.
+   - **Ignored PRs** shows the locally ignored count and a **Clear** button to
+     un-hide them all.
 
 4. Optional: configure [Nudge commands](#nudge-commands) so each PR row can run
 your own local reminder workflow. For example, this asks Codex to draft a review
